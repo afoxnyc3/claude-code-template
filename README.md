@@ -287,12 +287,58 @@ claude
 
 ### Brownfield (Existing Project)
 
-1. Start with just CLAUDE.md (map your architecture)
-2. Add `.claude/rules/01-code-standards.md` (document existing conventions)
-3. Add pre-commit hook (lint only at first)
-4. Progressively add component CLAUDE.md files
-5. Create knowledge skills from tribal knowledge
-6. Add parallel workflow when ready for multi-agent
+**Option 1: Automated Setup (Recommended)**
+
+```bash
+# From the template directory, point at your existing project
+~/Projects/claude-code-template/setup-brownfield.sh /path/to/existing/project
+
+# Or from within your project
+curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/setup-brownfield.sh | bash
+```
+
+The brownfield script:
+- ✅ Never overwrites existing files
+- ✅ Adds only what's missing
+- ✅ Skips CLAUDE.md (you run `/init` to generate it)
+- ✅ Preserves your existing structure
+
+**Option 2: Manual Incremental Adoption**
+
+```bash
+# Phase 1: Minimal (just context)
+curl -sL .../CLAUDE.md > CLAUDE.md
+# Edit to describe YOUR project
+
+# Phase 2: Add hooks
+mkdir -p .claude/hooks
+curl -sL .../pre-commit.sh > .claude/hooks/pre-commit.sh
+chmod +x .claude/hooks/*.sh
+
+# Phase 3: Add knowledge
+mkdir -p knowledge/staff-engineer-review
+curl -sL .../staff-engineer-review/SKILL.md > knowledge/staff-engineer-review/SKILL.md
+
+# Phase 4: Add skills (as needed)
+# Phase 5: Add subagents (as needed)
+# Phase 6: Add parallel workflow (when ready for multi-agent)
+```
+
+**After Brownfield Setup:**
+
+```bash
+cd /path/to/your/project
+claude
+# Then run:
+/init    # Analyzes codebase, generates CLAUDE.md content
+/prime   # Loads context
+```
+
+The `/init` skill will:
+1. Detect your tech stack (Python, Node, Go, etc.)
+2. Find your lint/test/build commands
+3. Map your directory structure
+4. Generate appropriate CLAUDE.md content
 
 ---
 
