@@ -1,0 +1,39 @@
+---
+# Path-specific rules - only loaded when working in matching paths
+# Rename this file to 04-api-rules.md and customize for your project
+paths:
+  - "src/api/**/*.py"
+  - "src/routes/**/*.ts"
+---
+
+# API Development Rules
+
+These rules apply only when working on API endpoints.
+
+## Endpoint Standards
+
+- All endpoints must include input validation (Pydantic for Python, Zod for TypeScript)
+- Return consistent error response format:
+  ```json
+  {"error": {"code": "ERROR_CODE", "message": "Human readable message"}}
+  ```
+- Include OpenAPI documentation for all public endpoints
+- Log request/response at INFO level (excluding sensitive data)
+
+## Authentication
+
+- All endpoints require authentication unless explicitly marked public
+- Use dependency injection for auth checking
+- Never include credentials in URL query parameters
+
+## Rate Limiting
+
+- Public endpoints: 100 requests/minute
+- Authenticated endpoints: 1000 requests/minute
+- Include `X-RateLimit-*` headers in responses
+
+## Versioning
+
+- Use URL path versioning: `/api/v1/`, `/api/v2/`
+- Maintain backward compatibility within major versions
+- Document breaking changes in CHANGELOG.md

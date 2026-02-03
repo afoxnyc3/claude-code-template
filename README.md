@@ -79,22 +79,30 @@ project-root/
 ├── .claude/
 │   ├── settings.json            # Hook triggers
 │   ├── settings.local.json      # Permission whitelist (gitignored)
+│   ├── agents/                  # Custom subagents
+│   │   ├── code-reviewer.md     # Code review specialist
+│   │   ├── researcher.md        # Read-only exploration
+│   │   └── test-runner.md       # Test execution
 │   ├── hooks/
+│   │   ├── auto-format.sh       # Format after Write/Edit
 │   │   ├── pre-commit.sh        # Lint + secret scan
 │   │   ├── post-commit.sh       # Tests (non-blocking)
 │   │   └── pre-pr-lint.sh       # Full lint before PR
 │   ├── rules/
 │   │   ├── 01-code-standards.md # Language/tool standards
 │   │   ├── 02-self-review.md    # Knowledge navigation
-│   │   └── 03-parallel-workflow.md # Multi-agent coordination
+│   │   ├── 03-parallel-workflow.md # Multi-agent coordination
+│   │   └── 04-api-rules.md.example # Path-specific rules example
 │   └── skills/
+│       ├── init/SKILL.md        # Bootstrap CLAUDE.md
 │       ├── prime/SKILL.md       # Load project context
 │       ├── work/SKILL.md        # Launch parallel agents
 │       ├── ps/SKILL.md          # Monitor parallel sessions
 │       ├── progress/SKILL.md    # Status report
 │       ├── pr-check/SKILL.md    # PR validation
 │       ├── review-pr/SKILL.md   # Process PR comments
-│       └── session-wrap/SKILL.md # Session documentation
+│       ├── session-wrap/SKILL.md # Session documentation
+│       └── setup-github-action/SKILL.md # CI/CD setup
 │
 ├── knowledge/                   # Domain expertise
 │   ├── staff-engineer-review/SKILL.md
@@ -165,12 +173,46 @@ Staff Engineer merges PRs in dependency order
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
 | `/prime` | Load project context | Start of session (auto) |
+| `/init` | Bootstrap CLAUDE.md from codebase | New/existing project setup |
 | `/work` | Launch parallel agents | When you have multiple issues to parallelize |
 | `/ps` | Check parallel session status | Monitor running agents |
 | `/progress` | Generate status report | Status updates, standups |
 | `/pr-check` | Validate PR readiness | Before creating PR |
 | `/review-pr` | Process PR comments | After receiving review feedback |
 | `/session-wrap` | Document session | End of session |
+| `/setup-github-action` | Configure CI/CD automation | Enable automated PR reviews |
+
+---
+
+## Subagents
+
+Custom subagents in `.claude/agents/` for delegated tasks:
+
+| Agent | Tools | Purpose |
+|-------|-------|---------|
+| `code-reviewer` | Read, Grep, Glob | Code review without modifying files |
+| `researcher` | Read, Grep, Glob, WebSearch | Explore codebase, gather information |
+| `test-runner` | Bash, Read, Glob | Run tests and report results |
+
+**When to use subagents vs parallel workflow:**
+
+| Pattern | Use Case |
+|---------|----------|
+| **Subagents** | Delegated tasks within ONE session (review, research, tests) |
+| **Parallel Workflow** (`/work`) | Multiple agents on different issues (separate worktrees) |
+
+Create custom subagents in `.claude/agents/your-agent.md`:
+
+```yaml
+---
+name: my-agent
+description: When to use this agent
+tools: Read, Grep, Glob  # Restricted tool access
+model: haiku             # Fast model for simple tasks
+---
+
+Instructions for the agent...
+```
 
 ---
 
@@ -223,9 +265,12 @@ cp knowledge/staff-engineer-review/SKILL.md knowledge/my-domain/SKILL.md
 
 | Hook | Trigger | Blocking? | Purpose |
 |------|---------|-----------|---------|
+| `auto-format.sh` | After Write/Edit | No | Auto-format files after changes |
 | `pre-commit.sh` | `git commit` | Yes | Lint staged files, block secrets |
 | `post-commit.sh` | After commit | No | Run tests, report failures |
 | `pre-pr-lint.sh` | `gh pr create` | Yes | Full repo lint check |
+
+The **auto-format hook** is a key pattern from Boris Cherny (Claude Code creator): automatically format code after every edit to catch formatting issues before they reach CI.
 
 ---
 

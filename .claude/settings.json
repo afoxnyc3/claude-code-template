@@ -23,6 +23,16 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-format.sh",
+            "timeout": 30
+          }
+        ]
+      },
+      {
         "matcher": "Bash(git commit:*)",
         "hooks": [
           {
