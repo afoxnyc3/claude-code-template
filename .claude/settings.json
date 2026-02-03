@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-commit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash(gh pr:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-pr-lint.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash(git commit:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-commit.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

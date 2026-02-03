@@ -1,0 +1,12 @@
+# Session documentation directory
+
+This directory contains session summaries and lessons learned.
+
+## Naming Convention
+
+- `YYYY-MM-DD-session.md` - Session summary
+- `YYYY-MM-DD-lessons.md` - Lessons learned
+
+## Creating Session Documentation
+
+Use the `/session-wrap` skill at the end of each session.
