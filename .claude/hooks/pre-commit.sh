@@ -6,6 +6,37 @@ set -e
 
 echo "Running pre-commit checks..."
 
+# ---------------------------------------------------------------------------
+# File Ownership Check (parallel agent isolation)
+# ---------------------------------------------------------------------------
+# AGENT_OWNS is a comma-separated list of path prefixes this agent may modify.
+# Set automatically by start-parallel-sessions.sh from config owned_paths.
+# Example: AGENT_OWNS="src/api/,tests/api/"
+
+if [ -n "$AGENT_OWNS" ]; then
+    echo "Checking file ownership (AGENT_OWNS=$AGENT_OWNS)..."
+
+    # Build grep pattern from comma-separated prefixes
+    OWNS_PATTERN=$(echo "$AGENT_OWNS" | tr ',' '\n' | sed 's/^/^/' | paste -sd'|' -)
+
+    # Find staged files outside owned paths
+    VIOLATIONS=$(git diff --cached --name-only | grep -v -E "$OWNS_PATTERN" || true)
+
+    if [ -n "$VIOLATIONS" ]; then
+        echo "BLOCKED: Agent modifying files outside owned paths."
+        echo ""
+        echo "Owned paths: $AGENT_OWNS"
+        echo ""
+        echo "Out-of-scope files:"
+        echo "$VIOLATIONS" | sed 's/^/  - /'
+        echo ""
+        echo "If this is intentional, unset AGENT_OWNS and retry."
+        exit 1
+    fi
+
+    echo "File ownership check passed."
+fi
+
 # Find changed Python files
 CHANGED_PY=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$' || true)
 

@@ -10,7 +10,21 @@ Check the status of all parallel work sessions (worktrees, branches, PRs).
 
 ## Instructions
 
-### Step 1: Discover Worktrees
+### Step 1: Run the Status Script
+
+If `scripts/parallel-session-status.sh` exists, use it:
+
+```bash
+# Run the automated status script
+./scripts/parallel-session-status.sh
+
+# Or specify a session name
+./scripts/parallel-session-status.sh my-session-name
+```
+
+If the script doesn't exist, gather the data manually with Steps 2-5 below.
+
+### Step 2: Discover Worktrees
 
 ```bash
 # List all worktrees
@@ -20,7 +34,7 @@ git worktree list
 PROJECT_NAME=$(basename $(git rev-parse --show-toplevel))
 ```
 
-### Step 2: Check Each Worktree Status
+### Step 3: Check Each Worktree Status
 
 ```bash
 # For each worktree, gather status
@@ -41,70 +55,87 @@ for wt in $(git worktree list --porcelain | grep "^worktree" | cut -d' ' -f2); d
 done
 ```
 
-### Step 3: Check PR Status
+### Step 4: Check PR Status
 
 ```bash
 # List open PRs
 gh pr list --state open --json number,title,headRefName,statusCheckRollup \
-  --jq '.[] | "\(.number) | \(.headRefName) | \(.title) | CI: \(.statusCheckRollup | map(select(.conclusion != null)) | if length > 0 then (if all(.conclusion == "SUCCESS") then "pass" else "fail" end) else "pending" end)"'
+  --jq '.[] | "\(.number) | \(.headRefName) | \(.title)"'
 ```
 
-### Step 4: Check tmux Sessions (if using tmux)
+### Step 5: Check tmux Sessions (if using tmux)
 
 ```bash
 # List tmux sessions
 tmux list-sessions 2>/dev/null || echo "No tmux sessions"
 
 # List panes in work session
-tmux list-panes -t "${PROJECT_NAME}-work" -F "#{pane_index}: #{pane_current_path} (#{pane_current_command})" 2>/dev/null || true
+tmux list-panes -t "${PROJECT_NAME}-parallel" -F "#{pane_index}: #{pane_current_path} (#{pane_current_command})" 2>/dev/null || true
 ```
 
-### Step 5: Generate Status Report
+### Step 6: Generate Status Report
 
 Present the results in this format:
 
 ```markdown
 ## Parallel Session Status
 
-**Project**: {{PROJECT_NAME}}
-**Timestamp**: {{YYYY-MM-DD HH:MM}}
+**Project**: {PROJECT_NAME}
+**Timestamp**: YYYY-MM-DD HH:MM
 
 ### Active Worktrees
 
 | Worktree | Branch | Status | Last Commit |
 |----------|--------|--------|-------------|
-| ../{{project}}-backend | feat/backend-api | Clean | 5 min ago: "feat: add user endpoint" |
-| ../{{project}}-frontend | feat/frontend-ui | 2 files | 12 min ago: "wip: dashboard" |
+| ../project-backend | feat/backend-api | Clean | 5 min ago: "feat: add endpoint" |
+| ../project-frontend | feat/frontend-ui | 2 files | 12 min ago: "wip: dashboard" |
 
 ### Open PRs
 
 | PR | Branch | Title | CI |
 |----|--------|-------|-----|
 | #42 | feat/backend-api | Add user management | pass |
-| #43 | feat/frontend-ui | Dashboard components | pending |
 
 ### PR Readiness
 
 | Branch | Uncommitted | Unpushed | Tests | Lint | Ready? |
 |--------|-------------|----------|-------|------|--------|
-| feat/backend-api | 0 | 0 | Pass | Pass | ✅ Ready |
-| feat/frontend-ui | 2 | 3 | Pass | Pass | ❌ Push needed |
+| feat/backend-api | 0 | 0 | Pass | Pass | Ready |
+| feat/frontend-ui | 2 | 3 | Pass | Pass | Push needed |
 
 ### Recommended Merge Order
 
-Based on dependencies (customize for your project):
+Derive from branch name patterns:
 
-1. **feat/infrastructure** - No dependencies, provisions resources
-2. **feat/backend-api** - Depends on infra
-3. **feat/frontend-ui** - Depends on backend
-4. **feat/docs** - Staff Engineer, merge last
+1. **infra/terraform/ci/cd branches** - No dependencies, provisions resources
+2. **deploy/ecs/k8s branches** - Depends on infra
+3. **backend/api/server branches** - Depends on infra
+4. **frontend/worker/service branches** - Depends on backend
+5. **docs/staff branches** - Staff Engineer, merge last
 
 ### Action Items
 
 - [ ] Push unpushed commits in `feat/frontend-ui`
 - [ ] Create PR for `feat/backend-api`
-- [ ] Wait for CI on PR #43
 ```
+
+---
+
+## Inter-Agent Status File
+
+The status script writes a machine-readable JSON file at `${TMPDIR:-/tmp}/{PROJECT_NAME}-agent-status.json`:
+
+```json
+{
+  "session": "project-parallel",
+  "updated_at": "2026-01-15T12:00:00Z",
+  "agents": [
+    {"pane": 0, "name": "project-backend", "branch": "feat/backend-api", "state": "working", "last_commit": "feat: add endpoint"}
+  ]
+}
+```
+
+Agents can read this file to see what other agents are doing.
 
 ---
 
@@ -124,40 +155,15 @@ A branch is ready for PR when:
 
 ## Merge Order Guidelines
 
-Customize this for your project's dependency graph:
+The status script derives merge order dynamically from branch name patterns. Customize the priority mapping in `scripts/parallel-session-status.sh` function `get_merge_priority()`:
 
-1. **Infrastructure** (`terraform/`, `.github/`) - First, enables everything else
-2. **Shared libraries** (`packages/common/`) - Before consumers
-3. **Backend/API** - Before frontend that consumes it
-4. **Frontend** - After backend
-5. **Documentation** (`docs/`) - Last, summarizes everything
-
----
-
-## Troubleshooting
-
-### Worktree shows stale status
-```bash
-# Fetch latest from remote
-git -C ../{{project}}-{{suffix}} fetch origin
-```
-
-### tmux session not found
-```bash
-# List all sessions
-tmux list-sessions
-
-# Reattach to session
-tmux attach -t {{session_name}}
-```
-
-### Branch diverged from main
-```bash
-# Rebase on main (in worktree)
-cd ../{{project}}-{{suffix}}
-git fetch origin main
-git rebase origin/main
-```
+| Priority | Branch Pattern | Description |
+|----------|---------------|-------------|
+| 1 | `*infra*`, `*terraform*`, `*ci*` | Infrastructure first |
+| 2 | `*deploy*`, `*ecs*`, `*k8s*` | Deployment configs |
+| 3 | `*backend*`, `*api*`, `*server*` | Backend/API |
+| 4 | `*frontend*`, `*worker*`, `*service*` | Services/frontend |
+| 5 | `*docs*`, `*staff*` | Documentation last |
 
 ---
 

@@ -88,6 +88,9 @@ safe_mkdir "$TARGET_DIR/knowledge"
 safe_mkdir "$TARGET_DIR/docs"
 safe_mkdir "$TARGET_DIR/docs/adr"
 safe_mkdir "$TARGET_DIR/docs/sessions"
+safe_mkdir "$TARGET_DIR/scripts"
+safe_mkdir "$TARGET_DIR/scripts/configs"
+safe_mkdir "$TARGET_DIR/scripts/configs/archive"
 
 # Copy hooks (these are safe - they only run on Claude Code actions)
 echo ""
@@ -119,7 +122,7 @@ fi
 # Copy essential skills
 echo ""
 echo -e "${CYAN}Adding skills...${NC}"
-for skill in init prime progress pr-check review-pr session-wrap; do
+for skill in init prime progress pr-check review-pr session-wrap work ps; do
     safe_mkdir "$TARGET_DIR/.claude/skills/$skill"
     safe_copy "$TEMPLATE_DIR/.claude/skills/$skill/SKILL.md" "$TARGET_DIR/.claude/skills/$skill/SKILL.md"
 done
@@ -140,6 +143,17 @@ safe_mkdir "$TARGET_DIR/knowledge/security-hardening"
 safe_copy "$TEMPLATE_DIR/knowledge/security-hardening/SKILL.md" "$TARGET_DIR/knowledge/security-hardening/SKILL.md"
 safe_mkdir "$TARGET_DIR/knowledge/production-readiness"
 safe_copy "$TEMPLATE_DIR/knowledge/production-readiness/SKILL.md" "$TARGET_DIR/knowledge/production-readiness/SKILL.md"
+
+# Copy parallel session scripts
+echo ""
+echo -e "${CYAN}Adding parallel session scripts...${NC}"
+safe_copy "$TEMPLATE_DIR/scripts/start-parallel-sessions.sh" "$TARGET_DIR/scripts/start-parallel-sessions.sh"
+safe_copy "$TEMPLATE_DIR/scripts/parallel-session-status.sh" "$TARGET_DIR/scripts/parallel-session-status.sh"
+safe_copy "$TEMPLATE_DIR/scripts/parallel-sessions.json" "$TARGET_DIR/scripts/parallel-sessions.json"
+safe_copy "$TEMPLATE_DIR/scripts/configs/.gitignore" "$TARGET_DIR/scripts/configs/.gitignore"
+
+# Make scripts executable
+chmod +x "$TARGET_DIR/scripts/"*.sh 2>/dev/null || true
 
 # Copy docs templates (only if not exists)
 echo ""
@@ -211,10 +225,11 @@ echo "  4. Review and customize .claude/rules/01-code-standards.md"
 echo "  5. Commit the new files: git add .claude knowledge docs CLAUDE.md"
 echo ""
 echo -e "${CYAN}What was added:${NC}"
-echo "  .claude/hooks/     - Git lifecycle hooks"
+echo "  .claude/hooks/     - Git lifecycle hooks (with file ownership enforcement)"
 echo "  .claude/rules/     - Auto-loaded project rules"
-echo "  .claude/skills/    - Workflow skills (/init, /prime, etc.)"
+echo "  .claude/skills/    - Workflow skills (/init, /prime, /work, /ps, etc.)"
 echo "  .claude/agents/    - Subagents (code-reviewer, researcher, test-runner)"
+echo "  scripts/           - Parallel session launcher, status monitor, config template"
 echo "  knowledge/         - Domain expertise skills"
 echo "  docs/adr/          - Architecture decision records"
 echo ""

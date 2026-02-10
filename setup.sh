@@ -45,9 +45,9 @@ echo ""
 # Create target directory
 mkdir -p "$TARGET_DIR"
 
-# Copy template files (excluding git, setup script, and [component] placeholder)
+# Copy template files (excluding git, setup scripts, and [component] placeholder)
 echo "Copying template files..."
-rsync -av --exclude='.git' --exclude='setup.sh' --exclude='[component]' "$TEMPLATE_DIR/" "$TARGET_DIR/"
+rsync -av --exclude='.git' --exclude='setup.sh' --exclude='setup-brownfield.sh' --exclude='[component]' "$TEMPLATE_DIR/" "$TARGET_DIR/"
 
 # Create component directory placeholder (renamed from [component])
 mkdir -p "$TARGET_DIR/src"
@@ -55,6 +55,11 @@ cp "$TEMPLATE_DIR/[component]/CLAUDE.md" "$TARGET_DIR/src/CLAUDE.md"
 
 # Make hooks executable
 chmod +x "$TARGET_DIR/.claude/hooks/"*.sh
+
+# Make parallel session scripts executable
+if [ -d "$TARGET_DIR/scripts" ]; then
+    chmod +x "$TARGET_DIR/scripts/"*.sh 2>/dev/null || true
+fi
 
 # Replace placeholders in key files
 echo "Customizing for $PROJECT_NAME..."
@@ -72,6 +77,8 @@ replace_placeholders "$TARGET_DIR/CLAUDE.md"
 replace_placeholders "$TARGET_DIR/AGENTS.md"
 replace_placeholders "$TARGET_DIR/docs/ARCHITECTURE.md"
 replace_placeholders "$TARGET_DIR/docs/adr/README.md"
+replace_placeholders "$TARGET_DIR/.claude/rules/03-parallel-workflow.md"
+replace_placeholders "$TARGET_DIR/scripts/parallel-sessions.json"
 
 # Initialize git if not already a repo
 if [ ! -d "$TARGET_DIR/.git" ]; then

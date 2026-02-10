@@ -8,7 +8,7 @@ A battle-tested template for integrating Claude Code into software projects. Ext
 
 ```bash
 # Clone this template
-git clone https://github.com/afoxnyc3/claude-code-template.git ~/Projects/claude-code-template
+git clone <your-template-repo-url> ~/Projects/claude-code-template
 
 # Create a new project
 ~/Projects/claude-code-template/setup.sh my-new-project
@@ -22,7 +22,7 @@ claude
 
 ```bash
 # Clone and copy to existing project
-git clone https://github.com/afoxnyc3/claude-code-template.git /tmp/cct
+git clone <your-template-repo-url> /tmp/cct
 cp -r /tmp/cct/{.claude,knowledge,docs,CLAUDE.md,AGENTS.md,.gitignore} /path/to/your/project/
 chmod +x /path/to/your/project/.claude/hooks/*.sh
 ```
@@ -35,11 +35,11 @@ For adding to an existing project incrementally:
 mkdir -p .claude/{hooks,rules} knowledge/staff-engineer-review
 
 # Copy essentials only
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/CLAUDE.md > CLAUDE.md
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/.claude/rules/01-code-standards.md > .claude/rules/01-code-standards.md
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/.claude/hooks/pre-commit.sh > .claude/hooks/pre-commit.sh
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/.claude/settings.json > .claude/settings.json
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/knowledge/staff-engineer-review/SKILL.md > knowledge/staff-engineer-review/SKILL.md
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/CLAUDE.md > CLAUDE.md
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/.claude/rules/01-code-standards.md > .claude/rules/01-code-standards.md
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/.claude/hooks/pre-commit.sh > .claude/hooks/pre-commit.sh
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/.claude/settings.json > .claude/settings.json
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/knowledge/staff-engineer-review/SKILL.md > knowledge/staff-engineer-review/SKILL.md
 
 chmod +x .claude/hooks/*.sh
 ```
@@ -85,7 +85,7 @@ project-root/
 │   │   └── test-runner.md       # Test execution
 │   ├── hooks/
 │   │   ├── auto-format.sh       # Format after Write/Edit
-│   │   ├── pre-commit.sh        # Lint + secret scan
+│   │   ├── pre-commit.sh        # Lint + secret scan + file ownership
 │   │   ├── post-commit.sh       # Tests (non-blocking)
 │   │   └── pre-pr-lint.sh       # Full lint before PR
 │   ├── rules/
@@ -103,6 +103,14 @@ project-root/
 │       ├── review-pr/SKILL.md   # Process PR comments
 │       ├── session-wrap/SKILL.md # Session documentation
 │       └── setup-github-action/SKILL.md # CI/CD setup
+│
+├── scripts/                     # Parallel session automation
+│   ├── start-parallel-sessions.sh  # tmux launcher (--dry-run supported)
+│   ├── parallel-session-status.sh  # Status monitor + inter-agent JSON
+│   ├── parallel-sessions.json      # Session config template
+│   └── configs/                    # Generated session configs
+│       ├── .gitignore              # Ignores generated work-session-*.json
+│       └── archive/                # Old session configs
 │
 ├── knowledge/                   # Domain expertise
 │   ├── staff-engineer-review/SKILL.md
@@ -162,9 +170,16 @@ Staff Engineer merges PRs in dependency order
 
 **Requirements for `/work`:**
 - GitHub CLI (`gh`) installed and authenticated
-- tmux installed
+- tmux and jq installed
 - Component ownership defined in `.claude/rules/03-parallel-workflow.md`
 - Open GitHub issues to work on
+
+**Parallel session features:**
+- **File ownership enforcement**: `AGENT_OWNS` env var + pre-commit hook blocks out-of-scope commits
+- **Per-agent context**: `.claude-agent.md` generated per worktree with identity and cross-agent awareness
+- **Dry-run preview**: `./scripts/start-parallel-sessions.sh --dry-run` shows what would launch
+- **Dynamic merge order**: Status script derives priority from branch name patterns
+- **Inter-agent status**: `${TMPDIR:-/tmp}/{project}-agent-status.json` written by status script for coordination
 
 ---
 
@@ -266,7 +281,7 @@ cp knowledge/staff-engineer-review/SKILL.md knowledge/my-domain/SKILL.md
 | Hook | Trigger | Blocking? | Purpose |
 |------|---------|-----------|---------|
 | `auto-format.sh` | After Write/Edit | No | Auto-format files after changes |
-| `pre-commit.sh` | `git commit` | Yes | Lint staged files, block secrets |
+| `pre-commit.sh` | `git commit` | Yes | Lint staged files, block secrets, enforce file ownership |
 | `post-commit.sh` | After commit | No | Run tests, report failures |
 | `pre-pr-lint.sh` | `gh pr create` | Yes | Full repo lint check |
 
@@ -294,7 +309,7 @@ claude
 ~/Projects/claude-code-template/setup-brownfield.sh /path/to/existing/project
 
 # Or from within your project
-curl -sL https://raw.githubusercontent.com/afoxnyc3/claude-code-template/main/setup-brownfield.sh | bash
+curl -sL https://raw.githubusercontent.com/<your-org>/claude-code-template/main/setup-brownfield.sh | bash
 ```
 
 The brownfield script:

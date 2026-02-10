@@ -1,0 +1,15 @@
+{
+  "_comment": "Session config template. Copy and customize for each work session. Generated configs go to scripts/configs/. Old configs archived to scripts/configs/archive/.",
+  "session_name": "{{PROJECT_NAME}}-parallel",
+  "startup_delay_seconds": 3,
+  "claude_flags": "--dangerously-skip-permissions",
+  "panes": [
+    {
+      "name": "Agent Name",
+      "directory": "/path/to/worktree",
+      "branch": "feat/component-description",
+      "owned_paths": ["src/component/", "tests/component/"],
+      "prompt": "You are the Agent Name agent for {{PROJECT_NAME}}, working autonomously in a parallel session. FIRST STEPS: 1. Read .claude-agent.md in this directory. 2. Read CLAUDE.md. 3. Read relevant knowledge docs. YOUR ASSIGNMENT: Branch: feat/component-description. Issues: #N. Owned paths: src/component/. ISSUE DETAILS: ... VALIDATION before EACH commit: lint, format, test. GIT WORKFLOW: conventional commits, push after each unit, reference issues. BEGIN NOW."
+    }
+  ]
+}

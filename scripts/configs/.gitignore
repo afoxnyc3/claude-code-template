@@ -1,0 +1,5 @@
+# Generated session configs (created by /work command)
+work-session-*.json
+
+# Keep the archive
+!archive/

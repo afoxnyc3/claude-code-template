@@ -1,6 +1,9 @@
 # Claude Code local settings (contains permissions, may vary per user)
 .claude/settings.local.json
 
+# Auto-generated per-agent context files (created by parallel session launcher)
+.claude-agent.md
+
 # Environment files
 .env
 .env.local

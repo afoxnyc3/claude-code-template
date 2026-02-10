@@ -15,7 +15,7 @@ This skill orchestrates parallel development by:
 1. Fetching open GitHub issues
 2. Grouping them by component to avoid merge conflicts
 3. Creating isolated git worktrees for each agent
-4. Launching parallel Claude Code sessions
+4. Launching parallel Claude Code sessions with ownership enforcement
 
 ## Instructions
 
@@ -67,73 +67,101 @@ Group issues into 3-5 work packages following these rules:
 
 ```
 # Example ownership mapping - CUSTOMIZE FOR YOUR PROJECT
-backend/         → Backend Agent
-frontend/        → Frontend Agent
-infrastructure/  → Infrastructure Agent
-docs/, knowledge/ → Staff Engineer Agent
+backend/         -> Backend Agent
+frontend/        -> Frontend Agent
+infrastructure/  -> Infrastructure Agent
+docs/, knowledge/ -> Staff Engineer Agent
 ```
 
 ### Step 5: Generate Agent Prompts
 
-For each agent, create a detailed prompt:
+**CRITICAL**: Each agent's `prompt` field MUST contain the FULL prompt below — not an abbreviated summary. Agents that receive short prompts skip important steps.
 
-```markdown
-## Agent: {{AGENT_NAME}}
+For each agent, fill in this template completely and use the entire result as the `prompt` value in the session config JSON:
 
-You are an autonomous AI agent working on {{PROJECT_NAME}}.
+```
+You are the {NAME} agent for this project, working autonomously in a parallel session.
 
-### CRITICAL: First Steps (DO NOT SKIP)
+FIRST STEPS (DO NOT SKIP):
+1. Read .claude-agent.md in this directory for your agent identity and other running agents
+2. Read CLAUDE.md
+3. Read relevant knowledge docs for your domain
+4. Review existing patterns in your owned directories
 
-1. Read CLAUDE.md at the project root
-2. Read relevant knowledge skills for your domain
-3. Review existing patterns in your owned directories
+YOUR ASSIGNMENT:
+- Branch: {BRANCH_NAME}
+- Issues: {#N, #M, ...}
+- Owned paths (you MUST NOT modify files outside these): {PATHS}
 
-### Your Assignment
+ISSUE DETAILS:
+{For each issue: number, title, description summary, acceptance criteria, suggested approach}
 
-**Branch**: feat/{{component}}-{{description}}
-**Issues**: #{{N}}, #{{M}}, ...
-**Owned Paths**: {{paths}}
+VALIDATION — before EACH commit:
+- Linting passes (ruff check / eslint / etc.)
+- Formatting passes (ruff format --check / prettier --check / etc.)
+- Tests pass (pytest / npm test / etc.)
+- No secrets committed
 
-### Issue Details
+GIT WORKFLOW:
+- Conventional commits: feat:, fix:, test:, docs:
+- Push after each logical unit
+- Reference issues: "Fixes #N" or "Part of #N"
 
-{{For each issue:}}
-#### Issue #{{number}}: {{title}}
+COORDINATION:
+- Stay in your lane — only modify files in your owned paths
+- The AGENT_OWNS env var enforces this at commit time
+- If you need something from another agent, document it in docs/INTEGRATION_REQUESTS.md
+- Do NOT wait for other agents — continue with other tasks
 
-**Acceptance Criteria**:
-{{criteria from issue body}}
+WHEN COMPLETE:
+1. Run /session-wrap to document your work
+2. Run /pr-check to validate PR readiness
+3. Create PR with gh pr create, referencing all closed issues
+4. Review your code against knowledge/staff-engineer-review/SKILL.md
 
-**Implementation Notes**:
-{{any technical guidance}}
-
----
-
-### Validation Checklist
-
-Before EACH commit:
-- [ ] Linting passes (`ruff check .` or `eslint .`)
-- [ ] Formatting passes (`ruff format --check .` or `prettier --check .`)
-- [ ] Tests pass (`pytest` or `npm test`)
-- [ ] No secrets committed
-
-### Before Creating PR
-
-1. Run `/pr-check` to validate readiness
-2. Run `/session-wrap` to document your work
-3. Create PR with `gh pr create`
-4. Reference issues: "Fixes #N" or "Part of #N"
-
-### Git Workflow
-
-- Commit often with conventional commits (feat:, fix:, test:, docs:)
-- Push after each logical unit of work
-- Stay within your owned paths only
-
-### START NOW
-
-Begin by reading CLAUDE.md, then start on your first issue.
+BEGIN NOW. Read CLAUDE.md, then the required knowledge docs, then start on your first issue.
 ```
 
-### Step 6: Setup Worktrees
+### Step 6: Create Session Configuration
+
+Generate config file at `scripts/configs/work-session-{timestamp}.json`:
+
+**IMPORTANT**: The config MUST include `owned_paths` for each pane. This is used by the launcher to set the `AGENT_OWNS` env var, which the pre-commit hook checks to block out-of-scope file modifications.
+
+```json
+{
+  "session_name": "{project}-work-{timestamp}",
+  "startup_delay_seconds": 3,
+  "claude_flags": "--dangerously-skip-permissions",
+  "panes": [
+    {
+      "name": "{Agent Display Name}",
+      "directory": "{/absolute/path/to/worktree}",
+      "branch": "{feat/branch-name}",
+      "owned_paths": ["{path/prefix/1/}", "{path/prefix/2/}"],
+      "prompt": "{FULL PROMPT FROM STEP 5 — not abbreviated}"
+    }
+  ]
+}
+```
+
+### Step 7: Show Dry Run Preview
+
+Before creating worktrees or launching, display a preview table:
+
+```
+## Work Session Preview
+
+| Agent | Branch | Issues | Owned Paths | Worktree |
+|-------|--------|--------|-------------|----------|
+| ... | ... | ... | ... | ... |
+
+Proceed? [Y/n]
+```
+
+Wait for user confirmation. If the user says no or wants changes, adjust the plan.
+
+### Step 8: Setup Worktrees
 
 For each agent, create an isolated worktree:
 
@@ -152,85 +180,31 @@ if ! git worktree list | grep -q "$WORKTREE_PATH"; then
     echo "Created worktree: $WORKTREE_PATH on branch $BRANCH"
 else
     echo "Worktree exists: $WORKTREE_PATH"
-    # Verify it's on the right branch
-    git -C "$WORKTREE_PATH" checkout "$BRANCH" 2>/dev/null || true
 fi
 ```
 
-### Step 7: Launch Parallel Sessions
-
-**Option A: tmux (Recommended)**
+### Step 9: Launch Sessions
 
 ```bash
-SESSION_NAME="${PROJECT_NAME}-work-$(date +%Y%m%d-%H%M)"
-
-# Create tmux session
-tmux new-session -d -s "$SESSION_NAME"
-
-# For each agent, create a pane and launch Claude
-WORKTREE_PATH="../${PROJECT_NAME}-{{suffix}}"
-PROMPT="{{agent_prompt}}"
-
-tmux split-window -t "$SESSION_NAME" -h
-tmux send-keys -t "$SESSION_NAME" "cd $WORKTREE_PATH && claude --dangerously-skip-permissions" Enter
-# Wait for Claude to start, then send prompt
-sleep 3
-tmux send-keys -t "$SESSION_NAME" "$PROMPT" Enter
-
-# Attach to session for monitoring
-tmux attach -t "$SESSION_NAME"
+./scripts/start-parallel-sessions.sh --config scripts/configs/work-session-{timestamp}.json
 ```
 
-**Option B: Separate Terminal Windows**
+### Step 10: Output Summary
 
-```bash
-# Generate launch script
-cat > /tmp/launch-agents.sh << 'EOF'
-#!/bin/bash
-# Launch each agent in a new terminal window
+Display:
 
-{{FOR_EACH_AGENT}}
-osascript -e 'tell app "Terminal" to do script "cd {{WORKTREE_PATH}} && claude --dangerously-skip-permissions -p \"{{PROMPT}}\""'
-{{END_FOR_EACH}}
-EOF
-
-chmod +x /tmp/launch-agents.sh
-/tmp/launch-agents.sh
 ```
-
-### Step 8: Output Summary
-
-Display the work session summary:
-
-```markdown
 ## Work Session Launched
 
-**Session**: {{PROJECT_NAME}}-work-{{timestamp}}
-**Agents**: {{N}}
+| Agent | Branch | Issues | Worktree | Ownership Enforced |
+|-------|--------|--------|----------|--------------------|
+| ... | ... | ... | ... | Yes/No |
 
-| Agent | Branch | Issues | Worktree |
-|-------|--------|--------|----------|
-| {{name}} | feat/{{branch}} | #{{issues}} | ../{{project}}-{{suffix}} |
-| ... | ... | ... | ... |
+Session: {project}-work-{timestamp}
 
-### Monitoring
+Monitor: /ps or ./scripts/parallel-session-status.sh {session_name}
 
-- Check status: `/ps` or `tmux list-panes -t {{session}}`
-- View agent: `tmux select-pane -t {{session}}:0.{{N}}`
-- Kill session: `tmux kill-session -t {{session}}`
-
-### After Completion
-
-1. Each agent creates their PR
-2. Review PRs in dependency order
-3. Staff Engineer merges last (handles docs, CLAUDE.md updates)
-
-### Worktree Cleanup (after merge)
-
-```bash
-git worktree remove ../{{project}}-{{suffix}}
-git branch -d feat/{{branch}}
-```
+Config: scripts/configs/work-session-{timestamp}.json
 ```
 
 ---
@@ -273,41 +247,15 @@ Always include a Staff Engineer agent when there are documentation or knowledge 
 
 ---
 
-## Example Session
-
-```
-$ /work
-
-Fetching issues... 12 open issues found
-Analyzing parallelization opportunities...
-
-Work Packages:
-1. Backend Agent (4 issues): #23, #25, #28, #31
-2. Frontend Agent (3 issues): #24, #26, #29
-3. Infrastructure Agent (2 issues): #27, #30
-4. Staff Engineer Agent (3 issues): #22, #32, #33
-
-Creating worktrees...
-✓ ../myproject-backend (feat/backend-api-improvements)
-✓ ../myproject-frontend (feat/frontend-dashboard)
-✓ ../myproject-infra (feat/infra-monitoring)
-✓ ../myproject-staff (feat/docs-updates)
-
-Launching tmux session: myproject-work-20260203-1430
-
-Session launched! Use `/ps` to monitor progress.
-```
-
----
-
 ## Required Setup
 
 For this skill to work, ensure:
 
 1. **GitHub CLI** installed and authenticated (`gh auth login`)
 2. **tmux** installed (for parallel session management)
-3. **Component ownership** defined in `.claude/rules/03-parallel-workflow.md`
-4. **Git** configured with your credentials
+3. **jq** installed (for config parsing)
+4. **Component ownership** defined in `.claude/rules/03-parallel-workflow.md`
+5. **Git** configured with your credentials
 
 ---
 
